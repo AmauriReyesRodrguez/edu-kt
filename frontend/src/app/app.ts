@@ -958,7 +958,8 @@ export class AppComponent implements OnInit {
     doc.text(`ID DE VALIDACIÓN : ${validationId}`, 75, 40);
 
     // QR Code (Top Right)
-    const verificationUrl = `https://edukt.com/verify?id=${validationId}`;
+    const baseUrl = environment.production ? 'https://edu-kt.vercel.app' : 'http://localhost:4200';
+    const verificationUrl = `${baseUrl}?certificate=${validationId}`;
     const qrUrl = await QRCode.toDataURL(verificationUrl);
     doc.addImage(qrUrl, 'PNG', pageWidth - 50, 15, 35, 35);
     doc.setDrawColor(230, 230, 230);
