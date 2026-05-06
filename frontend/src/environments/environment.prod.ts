@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://tu-backend.onrender.com/api' // Cambiar por la URL real de Render
+  apiUrl: 'https://edu-kt-api.onrender.com/api'
 };
