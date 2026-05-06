@@ -1,0 +1,802 @@
+﻿<app-navbar [currentUser]="currentUser" (viewChange)="setView($event)" (onLogout)="logout()"></app-navbar>
+
+<div *ngIf="globalAnnouncement" class="global-banner">
+  <div class="banner-content">
+    <strong>📢 Aviso:</strong> {{ globalAnnouncement }}
+  </div>
+  <button class="close-banner" (click)="clearGlobalAnnouncement()">×</button>
+</div>
+
+<main>
+  <!-- Landing View -->
+  <div *ngIf="view === 'landing'">
+    <app-hero></app-hero>
+
+    <section id="courses" class="courses-section">
+      <div class="section-header">
+        <h2 class="section-title">Explora Nuestros <span class="gradient-text">Cursos</span></h2>
+        <p class="section-subtitle">Programas de capacitación técnica con rutas de aprendizaje estructuradas.</p>
+      </div>
+
+      <!-- Category Filters -->
+      <div class="category-filters">
+        <button 
+          *ngFor="let cat of categories" 
+          [class.active]="selectedCategory === cat"
+          (click)="selectedCategory = cat"
+          class="filter-pill">
+          {{ cat }}
+        </button>
+      </div>
+
+      <div class="courses-grid">
+        <ng-container *ngFor="let course of featuredCourses">
+          <app-course-card 
+            *ngIf="selectedCategory === 'Todas' || course.category === selectedCategory"
+            [course]="course"
+            [enrolled]="isEnrolled(course.id)"
+            (onEnter)="enterCourse($event)">
+          </app-course-card>
+        </ng-container>
+      </div>
+    </section>
+  </div>
+
+  <!-- Course Detail View -->
+  <div *ngIf="view === 'course' && activeCourse" class="course-view animate-fade">
+    <div class="course-hero" [style.background]="'linear-gradient(135deg, ' + activeCourse.themeColor + ', ' + activeCourse.themeColor + '88)'">
+      <button class="back-btn" (click)="setView('landing')">← Volver a Cursos</button>
+      <h1>{{ activeCourse.title }}</h1>
+      <p>{{ activeCourse.description }}</p>
+      <div class="course-meta">
+        <span>📚 {{ activeCourse.levels?.length || 0 }} Niveles</span>
+        <span>🏠 {{ activeCourse.category }}</span>
+      </div>
+      
+      <!-- Course Progress in Hero -->
+      <div class="hero-progress" *ngIf="isEnrolled(activeCourse.id)">
+        <div class="progress-label">
+          <span>Tu progreso total</span>
+          <span>{{ activeCourse.progress }}%</span>
+        </div>
+        <app-progress-bar [value]="activeCourse.progress" color="white"></app-progress-bar>
+      </div>
+
+      <div class="hero-actions" style="display: flex; gap: 1rem; align-items: center; margin-top: 1.5rem;">
+        <button *ngIf="currentUser && !isEnrolled(activeCourse.id)" class="btn-primary btn-large" (click)="enrollInCourse()">Inscribirme en este Curso</button>
+        <span *ngIf="isEnrolled(activeCourse.id)" class="enrolled-badge">✅ Inscrito</span>
+        
+        <!-- Certificate Button -->
+        <button *ngIf="isEnrolled(activeCourse.id) && activeCourse.progress === 100" 
+                class="btn-primary" 
+                style="background: #FFD700; color: #000; border: none; font-weight: bold;"
+                (click)="generateCertificate(activeCourse)">
+          🎓 Descargar Certificado PDF
+        </button>
+      </div>
+      <p *ngIf="!currentUser" class="login-hint">Inicia sesión para inscribirte en este curso.</p>
+    </div>
+
+    <div class="course-content" *ngIf="activeCourse.levels?.length > 0">
+      <!-- Sidebar de Niveles -->
+      <div class="course-sidebar">
+        <h3>Contenido del Curso</h3>
+        <div *ngFor="let level of activeCourse.levels; let li = index" 
+             class="sidebar-level" [class.active]="activeLevelIndex === li" (click)="activeLevelIndex = li; activeLessonIndex = 0">
+          <span class="level-num">{{ li + 1 }}</span>
+          <div class="level-info">
+            <div class="level-title-row">
+              <strong>{{ level.title }}</strong>
+              <span class="level-percent" *ngIf="isEnrolled(activeCourse.id)">{{ getLevelProgress(level) }}%</span>
+            </div>
+            <app-progress-bar *ngIf="isEnrolled(activeCourse.id)" [value]="getLevelProgress(level)" [color]="activeCourse.themeColor"></app-progress-bar>
+            <small>{{ level.lessons?.length || 0 }} lecciones</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenido Principal -->
+      <div class="course-main">
+        <div class="lessons-nav" *ngIf="activeCourse.levels[activeLevelIndex]?.lessons?.length > 0">
+          <button *ngFor="let lesson of activeCourse.levels[activeLevelIndex].lessons; let li = index"
+                  [class.active]="activeLessonIndex === li"
+                  [class.completed]="isLessonCompleted(lesson.id)"
+                  (click)="activeLessonIndex = li"
+                  class="lesson-tab">
+            <span class="check-icon" *ngIf="isLessonCompleted(lesson.id)">✓</span>
+            {{ lesson.title }}
+          </button>
+        </div>
+
+        <div class="lesson-content glass" *ngIf="activeCourse.levels[activeLevelIndex]?.lessons?.length > 0">
+          <h2>{{ activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex]?.title }}</h2>
+          
+          <!-- Video -->
+          <div class="video-container" *ngIf="activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex]?.videoUrl">
+            <iframe [src]="formatVideoUrl(activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex].videoUrl) | safe" allowfullscreen class="video-iframe"></iframe>
+          </div>
+          <div class="no-video" *ngIf="!activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex]?.videoUrl">
+            🎬 No hay video para esta lección aún.
+          </div>
+
+          <!-- Documentos -->
+          <div class="documents-section" *ngIf="activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex]?.documents?.length > 0">
+            <h3>Archivos Adjuntos</h3>
+            <div class="document-viewer glass" *ngFor="let doc of activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex].documents">
+              <h4>📄 {{ doc.title }}</h4>
+              <iframe [src]="'https://docs.google.com/viewer?url=' + doc.url + '&embedded=true' | safe" class="doc-iframe"></iframe>
+              <a [href]="doc.url" target="_blank" class="download-link">Abrir en una nueva pestaña</a>
+            </div>
+          </div>
+
+          <!-- Texto -->
+          <div class="lesson-text" *ngIf="activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex]?.content">
+            <p>{{ activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex].content }}</p>
+          </div>
+          <div class="lesson-text empty" *ngIf="!activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex]?.content">
+            El contenido de esta lección aún no ha sido publicado.
+          </div>
+
+          <!-- Lesson Completion Action -->
+          <div class="lesson-actions" *ngIf="isEnrolled(activeCourse.id)">
+            <button class="btn-complete" 
+                    [class.is-completed]="isLessonCompleted(activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex].id)"
+                    [disabled]="isTogglingProgress"
+                    (click)="toggleLessonCompletion(activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex].id)">
+              <span *ngIf="isTogglingProgress">Guardando...</span>
+              <span *ngIf="!isTogglingProgress">
+                {{ isLessonCompleted(activeCourse.levels[activeLevelIndex].lessons[activeLessonIndex].id) ? '✓ Lección Completada' : 'Marcar como Completada' }}
+              </span>
+            </button>
+          </div>
+
+          <!-- Navegación entre lecciones -->
+          <div class="lesson-navigation">
+            <button class="btn-secondary" [disabled]="!canGoPrev()" (click)="prevLesson()">
+              ← Lección Anterior
+            </button>
+            <button class="btn-primary" [disabled]="!canGoNext()" (click)="nextLesson()">
+              Siguiente Lección →
+            </button>
+          </div>
+
+          <!-- Exam Section -->
+          <div class="exam-trigger-section" *ngIf="isEnrolled(activeCourse.id) && activeCourse.levels[activeLevelIndex]?.exam">
+            <hr>
+            <div class="exam-card-mini glass">
+              <h3>📝 Examen de Nivel</h3>
+              <p>Pon a prueba tus conocimientos de este nivel.</p>
+              <button class="btn-primary" (click)="startExam(activeCourse.levels[activeLevelIndex].exam)">
+                {{ getAverageGrade(activeCourse.id) > 0 ? 'Repetir Examen' : 'Realizar Examen' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+    <!-- Exam Modal -->
+    <div class="modal-overlay" *ngIf="currentExam" (click)="closeExam()">
+      <div class="modal-container exam-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Examen de Nivel</h3>
+          <button class="close-modal" (click)="closeExam()">×</button>
+        </div>
+        <div class="modal-body">
+          <div *ngIf="!showExamResult">
+            <div *ngFor="let q of currentExam.questions; let i = index" class="question-item glass">
+              <p><strong>{{ i + 1 }}. {{ q.question }}</strong></p>
+              <div class="options-list">
+                <label *ngFor="let opt of q.options; let oi = index" class="option-label">
+                  <input type="radio" [name]="'q' + i" [(ngModel)]="examAnswers[i]" [value]="oi">
+                  {{ opt }}
+                </label>
+              </div>
+            </div>
+            <button class="btn-primary btn-large" style="margin-top: 2rem; width: 100%;" (click)="submitExam()">Enviar Respuestas</button>
+          </div>
+
+          <div *ngIf="showExamResult" class="exam-result-view">
+            <div class="result-circle" [class.passed]="(examScore ?? 0) >= 70">
+              <span class="score-text">{{ examScore }}%</span>
+              <span class="result-status">{{ (examScore ?? 0) >= 70 ? 'APROBADO' : 'REPROBADO' }}</span>
+            </div>
+            <p *ngIf="(examScore ?? 0) >= 70">¡Felicidades! Has aprobado este examen.</p>
+            <p *ngIf="(examScore ?? 0) < 70">No has alcanzado la nota mínima (70%). Te recomendamos repasar los temas e intentarlo de nuevo.</p>
+            <button class="btn-primary btn-large" style="margin-top: 2rem; width: 100%;" (click)="closeExam()">Continuar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+        <div class="empty-state glass" *ngIf="!activeCourse.levels[activeLevelIndex]?.lessons?.length">
+          Este nivel aún no tiene lecciones publicadas.
+        </div>
+      </div>
+    </div>
+
+    <div class="empty-state glass" style="margin: 2rem 5%;" *ngIf="!activeCourse.levels?.length">
+      🛠️ Este curso aún está en construcción. Pronto tendrá contenido disponible.
+    </div>
+  </div>
+
+  <!-- Login View -->
+  <div *ngIf="view === 'login'" class="login-panel animate-fade">
+    <div class="login-container glass">
+      <div class="login-header">
+        <span class="gradient-text" style="font-size: 2rem; font-weight: 800;">EDÚ</span><span style="font-size: 2rem; font-weight: 800;">-KT</span>
+        <h2>Iniciar Sesión</h2>
+        <p>Ingresa tus credenciales para continuar</p>
+      </div>
+
+
+      <form class="login-form" (ngSubmit)="handleLogin()">
+        <div class="form-group">
+          <label>Correo Electrónico</label>
+          <input type="email" name="email" [(ngModel)]="loginData.email" placeholder="ejemplo@correo.com" required>
+        </div>
+
+        <div class="form-group">
+          <label>Contraseña</label>
+          <div class="input-with-eye">
+            <input [type]="showLoginPassword ? 'text' : 'password'" name="password" [(ngModel)]="loginData.password" placeholder="••••••••" required>
+            <button type="button" class="eye-btn" (click)="showLoginPassword = !showLoginPassword" tabindex="-1">
+              {{ showLoginPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary login-btn" [disabled]="isLoggingIn">
+          <span *ngIf="!isLoggingIn">Ingresar al Sistema</span>
+          <span *ngIf="isLoggingIn">Verificando...</span>
+        </button>
+      </form>
+      <div *ngIf="loginError" class="alert-error" style="margin-top: 1.5rem;">
+        {{ loginError }}
+      </div>
+
+      <div class="login-footer">
+        <p>¿Olvidaste tu contraseña? <a href="javascript:void(0)" (click)="setView('recovery')">Recuperar aquí</a></p>
+        <p style="margin-top: 0.5rem;">¿No tienes cuenta? <a href="javascript:void(0)" (click)="setView('register')">Regístrate</a></p>
+        <button class="btn-outline" style="margin-top: 1rem; width: 100%;" (click)="setView('landing')">Volver al Inicio</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register View -->
+  <div *ngIf="view === 'register'" class="login-panel animate-fade">
+    <div class="login-container glass" style="max-width: 500px;">
+      <div class="login-header">
+        <span class="gradient-text" style="font-size: 2rem; font-weight: 800;">EDÚ</span><span style="font-size: 2rem; font-weight: 800;">-KT</span>
+        <h2>Crear Cuenta</h2>
+        <p>Únete y comienza a aprender hoy</p>
+      </div>
+
+
+      <form class="login-form" (ngSubmit)="handleRegister()">
+        <div class="form-group">
+          <label>Nombre Completo</label>
+          <input type="text" name="name" [(ngModel)]="registerData.name" placeholder="Tu Nombre" required [disabled]="isRegistering">
+        </div>
+
+        <div class="form-group">
+          <label>Correo Electrónico</label>
+          <input type="email" name="email" [(ngModel)]="registerData.email" placeholder="ejemplo@correo.com" required [disabled]="isRegistering">
+        </div>
+        
+        <div class="form-group">
+          <label>Contraseña</label>
+          <div class="input-with-eye">
+            <input [type]="showRegPassword ? 'text' : 'password'" name="password" [(ngModel)]="registerData.password" (input)="checkPasswordStrength()" placeholder="••••••••" required [disabled]="isRegistering">
+            <button type="button" class="eye-btn" (click)="showRegPassword = !showRegPassword" tabindex="-1">
+              {{ showRegPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+          
+          <!-- Password Strength Meter -->
+          <div class="password-meter" *ngIf="registerData.password">
+            <div class="meter-bar">
+              <div class="meter-fill" 
+                   [class.weak]="passwordStrength === 1"
+                   [class.medium]="passwordStrength === 2"
+                   [class.strong]="passwordStrength === 3">
+              </div>
+            </div>
+            <span class="meter-text" 
+                  [class.text-weak]="passwordStrength === 1"
+                  [class.text-medium]="passwordStrength === 2"
+                  [class.text-strong]="passwordStrength === 3">
+              {{ passwordStrength === 1 ? 'Débil' : passwordStrength === 2 ? 'Media' : 'Fuerte' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Confirmar Contraseña</label>
+          <div class="input-with-eye">
+            <input [type]="showRegConfirmPassword ? 'text' : 'password'" name="confirmPassword" [(ngModel)]="registerData.confirmPassword" placeholder="••••••••" required [disabled]="isRegistering">
+            <button type="button" class="eye-btn" (click)="showRegConfirmPassword = !showRegConfirmPassword" tabindex="-1">
+              {{ showRegConfirmPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Inscribirse en Curso (Opcional)</label>
+          <select name="selectedCourseId" [(ngModel)]="registerData.selectedCourseId" [disabled]="isRegistering">
+            <option value="">Selecciona un curso más tarde...</option>
+            <ng-container *ngFor="let course of featuredCourses">
+              <option *ngIf="course.isActive" [value]="course.id">{{ course.title }}</option>
+            </ng-container>
+          </select>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" name="isAdmin" [(ngModel)]="registerData.isAdmin">
+            Registrarme como Administrador
+          </label>
+        </div>
+
+        <button type="submit" class="btn-primary login-btn" [disabled]="isRegistering">
+          <span *ngIf="!isRegistering">Registrarse</span>
+          <span *ngIf="isRegistering">Creando cuenta...</span>
+        </button>
+      </form>
+      <div *ngIf="registerError" class="alert-error" style="margin-top: 1.5rem;">
+        {{ registerError }}
+      </div>
+
+      <div class="login-footer">
+        <p>¿Ya tienes cuenta? <a href="javascript:void(0)" (click)="setView('login')">Inicia Sesión aquí</a></p>
+        <button class="btn-outline" style="margin-top: 1rem; width: 100%;" (click)="setView('landing')">Volver al Inicio</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recovery View -->
+  <div *ngIf="view === 'recovery'" class="login-panel animate-fade">
+    <div class="login-container glass">
+      <div class="login-header">
+        <span class="gradient-text" style="font-size: 2rem; font-weight: 800;">EDÚ</span><span style="font-size: 2rem; font-weight: 800;">-KT</span>
+        <h2>Recuperar Contraseña</h2>
+        <p>Te enviaremos un enlace de recuperación a tu correo</p>
+      </div>
+      <div *ngIf="recoverySent" class="alert-success">
+        ✅ Se ha enviado un correo de recuperación a <strong>{{ recoveryEmail }}</strong>. Revisa tu bandeja de entrada.
+      </div>
+
+      <form class="login-form" (ngSubmit)="sendRecoveryEmail()" *ngIf="!recoverySent">
+        <div class="form-group">
+          <label>Correo Electrónico</label>
+          <input type="email" name="recoveryEmail" [(ngModel)]="recoveryEmail" placeholder="ejemplo@correo.com" required>
+        </div>
+
+        <button type="submit" class="btn-primary login-btn" [disabled]="!recoveryEmail">
+          Enviar Enlace de Recuperación
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <p><a href="javascript:void(0)" (click)="setView('login')">Volver al Inicio de Sesión</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin View -->
+  <div *ngIf="view === 'admin'" class="admin-panel animate-fade">
+    <div class="admin-header">
+      <h2 class="section-title">Panel de <span class="gradient-text">Administración</span></h2>
+      <button class="btn-primary" (click)="setView('landing')">Volver a la Web</button>
+    </div>
+
+    <div class="admin-stats glass">
+      <div class="stat-card">
+        <h3>12</h3>
+        <p>Cursos Activos</p>
+      </div>
+      <div class="stat-card">
+        <h3>156</h3>
+        <p>Usuarios Registrados</p>
+      </div>
+      <div class="stat-card">
+        <h3>24</h3>
+        <p>Nuevas Inscripciones</p>
+      </div>
+    </div>
+
+    <div class="admin-tabs">
+      <button [class.active]="adminTab === 'courses'" (click)="setAdminTab('courses')">📚 Gestión de Cursos</button>
+      <button [class.active]="adminTab === 'announcements'" (click)="setAdminTab('announcements')">📢 Gestión de Anuncios</button>
+      <button [class.active]="adminTab === 'users'" (click)="setAdminTab('users')">👥 Gestión de Usuarios</button>
+      <button [class.active]="adminTab === 'audit'" (click)="setAdminTab('audit')">📜 Auditoría</button>
+    </div>
+
+    <div class="admin-content">
+      <!-- Panel de Cursos -->
+      <div class="admin-section glass" *ngIf="adminTab === 'courses'">
+        <h3>Gestión de Cursos</h3>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Curso</th>
+              <th>Color</th>
+              <th>Categoría</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let course of featuredCourses">
+              <td>{{ course.title }}</td>
+              <td><span class="color-swatch" [style.background]="course.themeColor"></span></td>
+              <td>{{ course.category }}</td>
+              <td>
+                <span [class]="course.isActive ? 'status-active' : 'status-inactive'">
+                  {{ course.isActive ? 'Activo' : 'Inactivo' }}
+                </span>
+              </td>
+              <td>
+                <button class="btn-icon" (click)="editCourse(course)" title="Editar Curso">✏️</button>
+                <button class="btn-icon" (click)="course.isActive = !course.isActive" title="Cambiar Estado">🔄</button>
+                <button class="btn-icon" (click)="deleteCourse(course.id)" title="Eliminar">🗑️</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Panel de Anuncios -->
+      <div class="admin-section glass" *ngIf="adminTab === 'announcements'">
+        <h3>Gestión de Anuncios</h3>
+        <p>Añade un mensaje para todos o para un curso en específico.</p>
+        
+        <div class="announcement-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tipo de Anuncio</label>
+              <select [(ngModel)]="announcementType">
+                <option value="global">Global (Toda la plataforma)</option>
+                <option value="specific">Específico (Solo en un curso)</option>
+              </select>
+            </div>
+            <div class="form-group" *ngIf="announcementType === 'specific'">
+              <label>Selecciona el Curso</label>
+              <select [(ngModel)]="selectedCourseIdForAnnouncement">
+                <option value="">Seleccione un curso...</option>
+                <option *ngFor="let course of featuredCourses" [value]="course.id">{{ course.title }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Expira en (Opcional)</label>
+              <input type="datetime-local" [(ngModel)]="announcementExpiresAt">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Mensaje del Anuncio</label>
+            <textarea [(ngModel)]="announcementText" placeholder="Escribe el anuncio aquí..." class="admin-textarea"></textarea>
+          </div>
+
+          <button class="btn-primary" (click)="publishAnnouncement()">Publicar Anuncio</button>
+        </div>
+
+        <div class="existing-announcements" style="margin-top: 2rem;">
+          <h4>Anuncios Publicados</h4>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Mensaje</th>
+                <th>Tipo</th>
+                <th>Expira</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let ann of allAnnouncements">
+                <td style="max-width: 300px;">{{ ann.text }}</td>
+                <td>
+                  <span class="category-pill" [class.global]="ann.type === 'global'">
+                    {{ ann.type === 'global' ? 'Global' : 'Curso: ' + getCourseTitle(ann.courseId) }}
+                  </span>
+                </td>
+                <td>{{ ann.expiresAt ? (ann.expiresAt | date:'short') : 'Nunca' }}</td>
+                <td>
+                  <button class="btn-icon" (click)="deleteAnnouncement(ann.id)">🗑️</button>
+                </td>
+              </tr>
+              <tr *ngIf="allAnnouncements.length === 0">
+                <td colspan="4" class="empty-state">No hay anuncios publicados.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Course Edit Modal -->
+    <div class="modal-overlay" *ngIf="showEditModal" (click)="closeEditModal()">
+      <div class="modal-container" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Editar: {{ editingCourse?.title }}</h3>
+          <button class="close-modal" (click)="closeEditModal()">×</button>
+        </div>
+
+        <div class="modal-tabs">
+          <button [class.active]="editTab === 'info'" (click)="editTab = 'info'">📋 Info Básica</button>
+          <button [class.active]="editTab === 'levels'" (click)="editTab = 'levels'">📚 Niveles y Lecciones</button>
+        </div>
+
+        <div class="modal-body">
+          <div *ngIf="editTab === 'info'" class="tab-content">
+            <div class="form-group">
+              <label>Título del Curso</label>
+              <input type="text" [(ngModel)]="editingCourse.title">
+            </div>
+            <div class="form-group">
+              <label>Descripción</label>
+              <textarea [(ngModel)]="editingCourse.description" class="admin-textarea"></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Categoría</label>
+                <input type="text" [(ngModel)]="editingCourse.category">
+              </div>
+              <div class="form-group">
+                <label>Color del Curso</label>
+                <input type="color" [(ngModel)]="editingCourse.themeColor" style="height: 40px; width: 100%;">
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="editTab === 'levels'" class="tab-content">
+            <div class="levels-panel">
+              <div class="levels-sidebar">
+                <div class="sidebar-header">
+                  <h4>Niveles</h4>
+                  <button class="btn-primary btn-sm" (click)="addLevel()">+ Nivel</button>
+                </div>
+                <div class="level-list">
+                  <div *ngFor="let level of editingCourse.levels; let i = index" 
+                       class="level-item" [class.selected]="editingLevelIndex === i"
+                       (click)="selectLevel(i)">
+                    <span class="level-order">{{ i + 1 }}</span>
+                    <input type="text" [(ngModel)]="level.title" (click)="$event.stopPropagation()" class="level-name-input">
+                    <button class="btn-icon-sm" (click)="removeLevel(i); $event.stopPropagation()">🗑️</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="level-detail" *ngIf="editingLevelIndex !== null">
+                <div class="detail-header">
+                  <h4>Lecciones del Nivel {{ editingLevelIndex! + 1 }}</h4>
+                  <button class="btn-primary btn-sm" (click)="addLesson(editingLevelIndex!)">+ Lección</button>
+                </div>
+                <div *ngFor="let lesson of editingCourse.levels[editingLevelIndex!].lessons; let j = index" 
+                     class="lesson-card glass" [class.selected]="editingLessonIndex === j">
+                  <div class="lesson-header" (click)="selectLesson(j)">
+                    <span>📄 {{ lesson.title }}</span>
+                    <button class="btn-icon-sm" (click)="removeLesson(editingLevelIndex!, j); $event.stopPropagation()">🗑️</button>
+                  </div>
+                  <div class="lesson-body" *ngIf="editingLessonIndex === j">
+                    <div class="form-group">
+                      <label>Título de la Lección</label>
+                      <input type="text" [(ngModel)]="lesson.title">
+                    </div>
+                    <div class="form-group">
+                      <label>URL del Video</label>
+                      <input type="text" [(ngModel)]="lesson.videoUrl">
+                    </div>
+                    <div class="form-group">
+                      <label>Contenido</label>
+                      <textarea [(ngModel)]="lesson.content" class="admin-textarea"></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-primary" (click)="saveCourse()">Guardar Todo</button>
+          <button class="btn-outline" (click)="closeEditModal()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+      <!-- Panel de Usuarios -->
+      <div class="admin-section glass" *ngIf="adminTab === 'users'">
+        <h3>Gestión de Usuarios</h3>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Rol</th>
+              <th>Inscripciones</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let user of allUsers">
+              <td>{{ user.fullName || user.name }}</td>
+              <td>{{ user.email }}</td>
+              <td><span class="category-pill" [class.global]="user.role === 'ADMIN'">{{ user.role }}</span></td>
+              <td>{{ user._count?.enrollments || 0 }}</td>
+              <td>
+                <button class="btn-icon" (click)="deleteUser(user.id)" [disabled]="user.id === currentUser?.id">🗑️</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Panel de Auditoría -->
+      <div class="admin-section glass" *ngIf="adminTab === 'audit'">
+        <div class="detail-header">
+          <h3>Registro de Auditoría</h3>
+          <button class="btn-primary btn-sm" (click)="printAudit()">🖨️ Imprimir Reporte</button>
+        </div>
+
+        <div class="audit-filters glass no-print" style="margin-top: 1rem;">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Buscar</label>
+              <input type="text" [(ngModel)]="searchTerm" (input)="searchLogs()" placeholder="Usuario o acción...">
+            </div>
+            <div class="form-group">
+              <label>Filtrar Acción</label>
+              <select [(ngModel)]="filterAction" (change)="searchLogs()">
+                <option value="">Todas</option>
+                <option value="LOGIN">Login</option>
+                <option value="REGISTRO">Registro</option>
+                <option value="ELIMINAR_USUARIO">Eliminar Usuario</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <table class="admin-table audit-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Acción</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let log of filteredLogs">
+              <td>{{ log.user?.email || 'N/A' }}</td>
+              <td><span class="action-badge">{{ log.action }}</span></td>
+              <td>
+                <span [class]="log.status === 'EXITOSO' ? 'status-active' : 'status-inactive'">
+                  {{ log.status }}
+                </span>
+              </td>
+              <td>{{ log.timestamp | date:'short' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <!-- Profile View -->
+  <div *ngIf="view === 'profile' && currentUser" class="profile-view animate-fade">
+    <div class="profile-container glass">
+      <div class="profile-header">
+        <div class="avatar-upload">
+          <div class="avatar-preview">
+            <img [src]="profileData.avatarUrl || 'https://via.placeholder.com/150'" alt="Avatar">
+          </div>
+          <label for="avatarFile" class="btn-outline btn-sm">Cambiar Foto</label>
+          <input type="file" id="avatarFile" (change)="onAvatarChange($event)" style="display: none;" accept="image/*">
+        </div>
+        <div class="profile-title">
+          <h2>Mi Perfil</h2>
+          <p>{{ currentUser.email }}</p>
+        </div>
+      </div>
+
+      <div class="profile-form">
+        <div class="form-group">
+          <label>Nombre de Usuario (Login)</label>
+          <input type="text" [(ngModel)]="currentUser.name">
+        </div>
+        <div class="form-group">
+          <label>Nombre Completo (Para el certificado)</label>
+          <input type="text" [(ngModel)]="profileData.fullName" placeholder="Ej: Juan Pérez García">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Documento de Identidad</label>
+            <input type="text" [(ngModel)]="profileData.documentId" placeholder="DNI, Cédula, etc.">
+          </div>
+          <div class="form-group">
+            <label>Teléfono de Contacto</label>
+            <input type="text" [(ngModel)]="profileData.phone" placeholder="+54 123 456789">
+          </div>
+        </div>
+
+        <div class="profile-actions" style="margin-top: 2rem;">
+          <button class="btn-primary" (click)="updateProfile()">Guardar Cambios</button>
+          <button class="btn-outline" (click)="setView('landing')">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="profile-stats" style="margin-top: 3rem;">
+        <h3>Mis Logros y Desempeño</h3>
+        <div class="stats-grid">
+          <div class="stat-box glass" *ngFor="let course of featuredCourses">
+            <ng-container *ngIf="isEnrolled(course.id)">
+              <h4>{{ course.title }}</h4>
+              <div class="stat-row">
+                <span>Progreso:</span>
+                <strong>{{ course.progress }}%</strong>
+              </div>
+              <div class="stat-row" *ngIf="getAverageGrade(course.id) > 0">
+                <span>Nota Promedio:</span>
+                <strong>{{ getAverageGrade(course.id) }}/100</strong>
+              </div>
+              <button *ngIf="course.progress === 100" 
+                      class="btn-primary btn-sm" 
+                      style="margin-top: 1rem; width: 100%;"
+                      (click)="generateCertificate(course)">
+                Descargar Certificado
+              </button>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About Us View -->
+  <div *ngIf="view === 'about'" class="info-view animate-fade">
+    <div class="info-container glass">
+      <h2>Sobre <span class="gradient-text">EDÚ-KT</span></h2>
+      <p>Somos una plataforma líder en educación técnica, dedicada a proporcionar rutas de aprendizaje estructuradas para el desarrollo profesional.</p>
+      <div class="info-grid">
+        <div class="info-card glass">
+          <h3>Misión</h3>
+          <p>Empoderar a las personas a través del conocimiento práctico y accesible.</p>
+        </div>
+        <div class="info-card glass">
+          <h3>Visión</h3>
+          <p>Ser el estándar de oro en capacitación técnica digital.</p>
+        </div>
+      </div>
+      <button class="btn-primary" (click)="setView('landing')">Volver al Inicio</button>
+    </div>
+  </div>
+
+  <!-- Contact Us View -->
+  <div *ngIf="view === 'contact'" class="info-view animate-fade">
+    <div class="info-container glass">
+      <h2>Contáctanos</h2>
+      <p>¿Tienes dudas? Envíanos un mensaje y te responderemos lo antes posible.</p>
+      
+      <div class="contact-form-container">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" [(ngModel)]="contactForm.name" placeholder="Tu nombre">
+        </div>
+        <div class="form-group">
+          <label>Correo Electrónico</label>
+          <input type="email" [(ngModel)]="contactForm.email" placeholder="tu@correo.com">
+        </div>
+        <div class="form-group">
+          <label>Asunto</label>
+          <input type="text" [(ngModel)]="contactForm.subject" placeholder="¿En qué podemos ayudarte?">
+        </div>
+        <div class="form-group">
+          <label>Mensaje</label>
+          <textarea [(ngModel)]="contactForm.message" rows="5" placeholder="Escribe tu mensaje aquí..."></textarea>
+        </div>
+        <button class="btn-primary btn-large" (click)="sendMessage()">Enviar Mensaje</button>
+      </div>
+      <button class="btn-outline" (click)="setView('landing')" style="margin-top: 1rem;">Cancelar</button>
+    </div>
+  </div>
+</main>
+

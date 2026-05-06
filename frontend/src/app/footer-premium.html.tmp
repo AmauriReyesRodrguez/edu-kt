@@ -1,0 +1,45 @@
+<footer class="footer no-print">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <span class="gradient-text">EDÚ</span>-KT
+      </div>
+      <p class="footer-desc">Empoderando el futuro a través de la educación técnica de calidad. Aprende, crece y certifícate con los mejores profesionales de la industria.</p>
+      <div class="social-links">
+        <a href="javascript:void(0)" class="social-icon">fb</a>
+        <a href="javascript:void(0)" class="social-icon">ig</a>
+        <a href="javascript:void(0)" class="social-icon">tw</a>
+        <a href="javascript:void(0)" class="social-icon">ln</a>
+      </div>
+    </div>
+
+    <div class="footer-column">
+      <h4>Plataforma</h4>
+      <a href="javascript:void(0)" (click)="setView('landing')">Explorar Cursos</a>
+      <a href="javascript:void(0)" (click)="setView('about')">Sobre nosotros</a>
+      <a href="javascript:void(0)" (click)="setView('contact')">Contáctanos</a>
+    </div>
+
+    <div class="footer-column">
+      <h4>Área Estudiante</h4>
+      <a href="javascript:void(0)" (click)="setView('profile')">Mi Perfil</a>
+      <a href="javascript:void(0)" (click)="setView('login')">Iniciar Sesión</a>
+      <a href="javascript:void(0)" (click)="setView('register')">Registrarse</a>
+    </div>
+
+    <div class="footer-column">
+      <h4>Soporte</h4>
+      <a href="javascript:void(0)">Preguntas Frecuentes</a>
+      <a href="javascript:void(0)">Ayuda Técnica</a>
+      <a href="javascript:void(0)">Términos de Uso</a>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <p>© 2026 EDÚ-KT. Todos los derechos reservados.</p>
+    <div class="footer-badges">
+      <span>🛡️ Conexión Segura</span>
+      <span>🌟 Calidad Educativa</span>
+    </div>
+  </div>
+</footer>

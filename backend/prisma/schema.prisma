@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  TEACHER
+  ADMIN
+}
+
+model User {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String
+  name        String?
+  fullName    String?
+  documentId  String?
+  phone       String?
+  avatarUrl   String?
+  role                Role         @default(USER)
+  enrollments         Enrollment[]
+  auditLogs           AuditLog[]
+  examResults         ExamResult[]
+  failedLoginAttempts Int          @default(0)
+  lockoutUntil        DateTime?
+  createdAt           DateTime     @default(now())
+}
+
+model Course {
+  id           String       @id @default(uuid())
+  title        String
+  description  String
+  category     String       @default("General")
+  thumbnail    String?
+  themeColor   String       @default("#FF6B00")
+  announcement String?      @db.Text
+  isActive     Boolean      @default(true)
+  levels       Level[]
+  enrollments  Enrollment[]
+  createdAt    DateTime     @default(now())
+}
+
+model Level {
+  id          String       @id @default(uuid())
+  title       String
+  order       Int
+  courseId    String
+  course      Course       @relation(fields: [courseId], references: [id])
+  lessons     Lesson[]
+  exam        Exam?
+  createdAt   DateTime     @default(now())
+}
+
+model Lesson {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   @db.Text
+  videoUrl  String   @default("")
+  documents Json     @default("[]")
+  order     Int
+  levelId   String
+  level     Level    @relation(fields: [levelId], references: [id])
+  progress  Progress[]
+  createdAt DateTime @default(now())
+}
+
+model Exam {
+  id        String       @id @default(uuid())
+  questions Json         // Array of questions/answers
+  levelId   String       @unique
+  level     Level        @relation(fields: [levelId], references: [id])
+  results   ExamResult[]
+  createdAt DateTime     @default(now())
+}
+
+model Enrollment {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  progress  Int      @default(0) // 0-100%
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+model Progress {
+  id        String   @id @default(uuid())
+  userId    String
+  lessonId  String
+  completed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  lesson    Lesson   @relation(fields: [lessonId], references: [id])
+
+  @@unique([userId, lessonId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  status     String
+  ip         String?
+  deviceName String?
+  details    Json?
+  timestamp  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id])
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  text      String   @db.Text
+  type      String   // GLOBAL, COURSE
+  courseId  String?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+model ExamResult {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  examId    String
+  exam      Exam     @relation(fields: [examId], references: [id])
+  score     Int
+  passed    Boolean
+  createdAt DateTime @default(now())
+
+  @@unique([userId, examId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  email     String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

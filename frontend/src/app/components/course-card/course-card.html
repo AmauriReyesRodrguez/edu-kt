@@ -1,0 +1,46 @@
+<div class="glass course-card" 
+     [class.inactive]="!course.isActive"
+     [style.border-color]="course.themeColor + '33'">
+  
+  <div class="card-header" [style.background-color]="course.isActive ? course.themeColor : '#666'">
+    <span class="category">{{ course.category }}</span>
+  </div>
+  
+  <div class="card-image" *ngIf="course.thumbnail">
+    <img [src]="course.thumbnail" [alt]="course.title">
+  </div>
+
+  <div class="card-body">
+    <h3 class="course-title">{{ course.title }}</h3>
+    
+    <!-- Announcement Badge -->
+    <div *ngIf="course.announcement" class="announcement-box" [style.border-left-color]="course.themeColor">
+      <span class="announcement-icon">📢</span>
+      <p class="announcement-text">{{ course.announcement }}</p>
+    </div>
+
+    <p class="course-desc" *ngIf="course.isActive">{{ course.description }}</p>
+    <p class="course-desc unavailable" *ngIf="!course.isActive">Este curso no está disponible temporalmente.</p>
+    
+    <!-- Solo mostrar progreso si está inscrito -->
+    <div class="progress-section" *ngIf="course.isActive && enrolled">
+      <div class="progress-label">
+        <span>Progreso</span>
+        <span>{{ course.progress }}%</span>
+      </div>
+      <app-progress-bar [value]="course.progress" [color]="course.themeColor"></app-progress-bar>
+    </div>
+
+    <!-- Niveles badge -->
+    <div class="levels-badge" *ngIf="course.isActive && course.levels?.length > 0">
+      <span>📚 {{ course.levels.length }} nivel{{ course.levels.length > 1 ? 'es' : '' }}</span>
+    </div>
+    
+    <button class="btn-card" 
+            [disabled]="!course.isActive"
+            [style.background-color]="course.isActive ? course.themeColor : '#ccc'"
+            (click)="enterCourse()">
+      {{ !course.isActive ? 'No Disponible' : enrolled ? 'Continuar' : 'Ver Curso' }}
+    </button>
+  </div>
+</div>
