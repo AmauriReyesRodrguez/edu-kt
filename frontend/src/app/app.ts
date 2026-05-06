@@ -313,7 +313,7 @@ export class AppComponent implements OnInit {
   passwordStrength = 0; // 0=none, 1=weak, 2=medium, 3=strong
   isRegistering = false;
 
-  setView(newView: 'landing' | 'admin' | 'audit' | 'login' | 'register' | 'recovery' | 'course' | 'profile' | 'about' | 'contact' | 'terms') {
+  setView(newView: 'landing' | 'admin' | 'audit' | 'login' | 'register' | 'recovery' | 'reset-password' | 'course' | 'profile' | 'about' | 'contact' | 'terms') {
     this.view = newView;
     if (newView === 'audit' || (newView === 'admin' && this.adminTab === 'audit')) {
       this.loadAuditLogs();
